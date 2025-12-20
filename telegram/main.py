@@ -296,13 +296,35 @@ async def check_url(message, url):
     scan_stats["urls"] += 1
 
 
-@app.on_message(filters.text & ~filters.command(["start", "stats"]))
-async def handle_text(client, message):
+@app.on_message(filters.text & filters.private & ~filters.command(["start", "stats"]))
+async def handle_url_private(client, message):
+    """Handle URLs in private chats"""
     if not is_authorized(message):
         return
     
     url = extract_url(message.text)
     if url:
+        logger.info(f"URL detected: {url}")
+        task = asyncio.create_task(check_url(message, url))
+        task.add_done_callback(log_task_error)
+
+
+@app.on_message(filters.text & (filters.group | filters.channel) & ~filters.command(["start", "stats"]))
+async def handle_url_groups(client, message):
+    """Handle URLs in groups/channels"""
+    if not is_authorized(message):
+        return
+    
+    # In groups, only scan if message starts with /scan or is a reply to bot
+    if message.text.startswith('/scan '):
+        url = extract_url(message.text[6:])  # Remove '/scan '
+    elif message.reply_to_message and message.reply_to_message.from_user.is_self:
+        url = extract_url(message.text)
+    else:
+        return  # Ignore regular group messages
+    
+    if url:
+        logger.info(f"URL detected in group: {url}")
         task = asyncio.create_task(check_url(message, url))
         task.add_done_callback(log_task_error)
 
