@@ -342,16 +342,21 @@ async def callbck(client: pyrogram.client.Client, message: pyrogram.types.Callba
 # ============ BOT STARTUP ============
 
 if __name__ == "__main__":
+    import signal
+    
     logger.info("Bot is starting...")
+    
+    def signal_handler(sig, frame):
+        logger.info("Stopping bot...")
+        app.stop()
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
-        app.start()
-        logger.info("✅ Bot started successfully and is now running!")
-        logger.info(f"Bot username: @{app.me.username}")
-        app.idle()
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        logger.info("✅ Bot started and running!")
+        app.run()
     except Exception as e:
         logger.error(f"Bot crashed: {e}", exc_info=True)
     finally:
-        app.stop()
         logger.info("Bot stopped")
