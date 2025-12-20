@@ -48,7 +48,7 @@ __• You can send the file to the bot or forward it from another channel, and i
 
     await app.send_message(message.chat.id, START, reply_to_message_id=message.id, disable_web_page_preview=True,
     reply_markup=InlineKeyboardMarkup([[
-                                           InlineKeyboardButton( "📦 Source Code", url="https://github.com/connect-bad/VirusTotal-Bot" )
+                                           InlineKeyboardButton( "📦 Source Code", url="https://github.com/connect-bad/VirusTotal-Bot2.0" )
                                       ]]))
 
 
