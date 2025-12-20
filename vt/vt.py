@@ -79,7 +79,7 @@ class Virustotal:
         if response.ok:
             return response.text[15:-3]
         else:
-            raise f"Invalid response: {response.status_code}"
+            raise Exception(f"Invalid response: {response.status_code}")
     
 
     def upload_url(self, url):            
@@ -90,9 +90,9 @@ class Virustotal:
             if response.ok:
                 return url_id[2:66]
             else:
-                raise f"Error in validing the URL {url}"
+                raise Exception(f"Error in validing the URL {url}")
         else :
-            raise "Error in uploading url"
+            raise Exception("Error in uploading url")
         
     def check_url_exists(self, url):
         return 0 if self.session.get(f"https://www.virustotal.com/ui/search?query={urllib.parse.quote_plus(url)}",headers=self.upload_headers).json()['data'] == [] else 1
