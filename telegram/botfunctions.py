@@ -165,3 +165,78 @@ def cleaninfo(hash):
 
     link = f'https://virustotal.com/gui/file/{hash}'
     return fronttext, testtext, signatures, link
+
+def scan_url(url: str):
+    """Scan a URL on VirusTotal"""
+    if not VT_API_KEY:
+        logger.error("VirusTotal API key is missing")
+        return None
+    
+    response = session.post(f"{BASE_URL}/urls", data={"url": url})
+    
+    if not response.ok:
+        logger.error("URL submission failed: %s - %s", response.status_code, response.text)
+        return None
+    
+    analysis_id = response.json().get("data", {}).get("id")
+    if analysis_id:
+        wait_for_analysis(analysis_id, timeout=60)
+    
+    import base64
+    url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
+    return url_id
+
+
+def url_info(url_id: str):
+    """Get URL scan results"""
+    if not VT_API_KEY:
+        return None
+    
+    response = session.get(f"{BASE_URL}/urls/{url_id}")
+    if response.status_code == 404:
+        return None
+    if response.ok:
+        return response.json().get("data")
+    return None
+
+
+def cleanurl(url_id: str):
+    """Format URL scan results for display"""
+    obj = url_info(url_id)
+    if obj is None:
+        logger.warning("URL scan does not exist")
+        return None, None, None, None
+    
+    attributes = obj.get("attributes", {})
+    results = attributes.get("last_analysis_results") or {}
+    malicious_count, undetected_count, unsupported_count, DL, UL, NL, DR = counttests(results)
+    
+    url = attributes.get("url", "Unknown URL")
+    times_submitted = attributes.get("times_submitted", 0)
+    first_submission = _format_time(attributes.get("first_submission_date"))
+    last_analysis = _format_time(attributes.get("last_analysis_date"))
+    
+    fronttext = (
+        f'🧬 **Detections**: __{malicious_count} / {malicious_count+undetected_count}__'
+        f'\n\n🔗 **URL**: __{url}__'
+        f'\n⏱ **Times Submitted**: __{times_submitted}__'
+        f'\n\n🔬 **First Submission**\n• __{first_submission}__'
+        f'\n🔭 **Last Analysis**\n• __{last_analysis}__'
+    )
+    
+    testtext = '**❌ - Malicious/Suspicious\n✅ - Clean/Harmless\n⚠️ - Not Supported**\n➖➖➖➖➖➖➖➖➖➖\n'
+    for ele in DL:
+        testtext = f'{testtext}❌ {ele}\n'
+    for ele in UL:
+        testtext = f'{testtext}✅ {ele}\n'
+    for ele in NL:
+        testtext = f'{testtext}⚠️ {ele}\n'
+    
+    signatures_list = [f'❌ {engine}\n╰ {result or "Malicious"}\n' for engine, result in zip(DL, DR)]
+    signatures = ''.join(signatures_list)
+    
+    if malicious_count == 0:
+        signatures = "✅ This URL appears to be safe"
+    
+    link = f'https://virustotal.com/gui/url/{url_id}'
+    return fronttext, testtext, signatures, link
