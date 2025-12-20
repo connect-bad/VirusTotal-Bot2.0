@@ -4,9 +4,11 @@ import time
 from datetime import datetime
 
 import requests
+import logging
 
 VT_API_KEY = os.environ.get("VT_API_KEY") or os.environ.get("VIRUSTOTAL_API_KEY")
 BASE_URL = "https://www.virustotal.com/api/v3"
+logger = logging.getLogger(__name__)
 
 session = requests.Session()
 if VT_API_KEY:
@@ -23,14 +25,16 @@ def _hash_file(file_path: str) -> str:
 
 def uploadfile(file_path: str):
     if not VT_API_KEY:
-        return 0
+        logger.error("VirusTotal API key is missing")
+        return None
 
     file_hash = _hash_file(file_path)
     with open(file_path, "rb") as fp:
         response = session.post(f"{BASE_URL}/files", files={"file": (os.path.basename(file_path), fp)})
 
     if not response.ok:
-        return 0
+        logger.error("VirusTotal upload failed: %s - %s", response.status_code, response.text)
+        return None
 
     analysis_id = response.json().get("data", {}).get("id")
     if analysis_id:
@@ -99,12 +103,12 @@ def _format_time(timestamp: int):
 def cleaninfo(hash):
     obj = file_info(hash)
     if obj is None:
-        print("File does not Exist")
+        logger.warning("File does not Exist")
         return None, None, None, None
 
     attributes = obj.get("attributes", {})
     results = attributes.get("last_analysis_results") or {}
-    D, U, N, DL, UL, NL, DR = counttests(results)
+    malicious_count, undetected_count, unsupported_count, DL, UL, NL, DR = counttests(results)
 
     filename = attributes.get("meaningful_name") or (attributes.get("names") or [hash])[0]
     type_description = attributes.get("type_description", "Unknown")
@@ -115,16 +119,16 @@ def cleaninfo(hash):
     last_modification = _format_time(attributes.get("last_modification_date"))
     magic = attributes.get("magic", "N/A")
 
-    fronttext = f'🧬 **Detections**: __{D} / {D+U}__\
+    fronttext = f'🧬 **Detections**: __{malicious_count} / {malicious_count+undetected_count}__\
         \n\n🔖 **File Name**: __{filename}__\
         \n🔒 **File Type**: __{type_description} ({file_type})__\
         \n📁 **File Size**: __{pow(2,-20)*size:.2f} MB__\
-        \n⏱ **Times Submited**: __{times_submitted}__\
+        \n⏱ **Times Submitted**: __{times_submitted}__\
         \n\n🔬 **First Analysis**\n• __{first_submission}__\
         \n🔭 **Last Analysis**\n• __{last_modification}__\
         \n\n🎉 **Magic**\n• __{magic}__'
 
-    testtext = '**❌ - Malicious/Suspicious\n✅ - UnDetected/Harmless\n⚠️ -  Not Suported**\n➖➖➖➖➖➖➖➖➖➖\n'
+    testtext = '**❌ - Malicious/Suspicious\n✅ - UnDetected/Harmless\n⚠️ -  Not Supported**\n➖➖➖➖➖➖➖➖➖➖\n'
     for ele in DL:
         testtext = f'{testtext}❌ {ele}\n'
     for ele in UL:
@@ -132,12 +136,10 @@ def cleaninfo(hash):
     for ele in NL:
         testtext = f'{testtext}⚠️ {ele}\n'
 
-    signatures = ''
-    for engine, result in zip(DL, DR):
-        signatures = f'{signatures}❌ {engine}\
-    \n╰ {result or "Malicious"}\n'
+    signatures_list = [f'❌ {engine}\n╰ {result or "Malicious"}\n' for engine, result in zip(DL, DR)]
+    signatures = ''.join(signatures_list)
 
-    if D == 0:
+    if malicious_count == 0:
         signatures = "✅ Your File is Safe"
 
     link = f'https://virustotal.com/gui/file/{hash}'

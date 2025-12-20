@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 
 import pyrogram
@@ -16,6 +17,15 @@ app = Client("my_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 MAXSIZE = 681574400
 telegraph = Telegraph()
 telegraph.create_account(short_name='VirusTotal')
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+def status_file_path(message_id):
+    return f"{message_id}downstatus.txt"
+
+
+def log_task_error(task: asyncio.Task):
+    if task.exception():
+        logger.error("Scan task failed", exc_info=task.exception())
 
 # start command
 @app.on_message(filters.command(["start"]))
@@ -55,38 +65,39 @@ async def downstatus(statusfile, message):
 
 # progress function
 def progress(current, total, message):
-    with open(f'{message.id}downstatus.txt',"w") as fileup:
+    with open(status_file_path(message.id),"w") as fileup:
         fileup.write(f"{current * 100 / total:.1f}%")
 
 
 # check function
 async def checkvirus(message):
     msg = await app.send_message(message.chat.id, '🔽 Downloading...', reply_to_message_id=message.id)
-    print(f"Downloading: ID:  {message.id}  size: {message.document.file_size}")
-    dnsta = asyncio.create_task(downstatus(f'{message.id}downstatus.txt', msg))
+    logger.info("Downloading: ID: %s size: %s", message.id, message.document.file_size)
+    dnsta = asyncio.create_task(downstatus(status_file_path(message.id), msg))
 
     file = await app.download_media(message, progress=progress, progress_args=[message])
-    if os.path.exists(f'{message.id}downstatus.txt'):
-        os.remove(f'{message.id}downstatus.txt')
+    status_path = status_file_path(message.id)
+    if os.path.exists(status_path):
+        os.remove(status_path)
     await app.edit_message_text(message.chat.id, msg.id, '🔼 Uploading to VirusTotal...')
-    print(f"Uploading: ID: {message.id}  size: {message.document.file_size}")
+    logger.info("Uploading: ID: %s size: %s", message.id, message.document.file_size)
 
     hash = await asyncio.to_thread(botfunctions.uploadfile, file)
     os.remove(file)
-    print(f'ID: {message.id}  HASH: {hash}')
+    logger.info('ID: %s HASH: %s', message.id, hash)
     
-    if hash == 0:
+    if not hash:
         await app.edit_message_text(message.chat.id, msg.id, "✖️ Failed")
-        print("HASH is 0")
+        logger.error("HASH is empty")
         return
         
     await app.edit_message_text(message.chat.id, msg.id, '⚙️ Checking...')
-    print(f"Checking: ID:  {message.id}  size: {message.document.file_size}")
+    logger.info("Checking: ID: %s size: %s", message.id, message.document.file_size)
     maintext, checktext, signatures, link = await asyncio.to_thread(botfunctions.cleaninfo, hash)
     
     if maintext == None:
         await app.edit_message_text(message.chat.id, msg.id, "✖️ Failed")
-        print("Function returned None")
+        logger.error("Function returned None")
         return
 
     response = telegraph.create_page('VT', content=[f'{maintext}-|-{checktext}-|-{signatures}-|-{link}'])
@@ -108,7 +119,8 @@ async def docu(client: pyrogram.client.Client, message: pyrogram.types.messages_
     if int(message.document.file_size) > MAXSIZE:
         await app.send_message(message.chat.id, "⭕️ File is too Big for VirusTotal. It should be less than 650 MB", reply_to_message_id=message.id)
         return
-    asyncio.create_task(checkvirus(message))
+    task = asyncio.create_task(checkvirus(message))
+    task.add_done_callback(log_task_error)
 	
 
 # call back functon
@@ -158,6 +170,6 @@ async def callbck(client: pyrogram.client.Client, message: pyrogram.types.Callba
     
 # app run
 if __name__ == "__main__":
-    print("Bot is starting...")
+    logger.info("Bot is starting...")
     app.run()
-    print("Bot stopped")
+    logger.info("Bot stopped")
