@@ -133,7 +133,7 @@ async def strt(client: pyrogram.client.Client, message: pyrogram.types.messages_
 
     await app.send_message(message.chat.id, START, reply_to_message_id=message.id, disable_web_page_preview=True,
     reply_markup=InlineKeyboardMarkup([[
-        InlineKeyboardButton("📦 Source Code", url="https://github.com/bipinkrish/VirusTotal-Bot")
+        InlineKeyboardButton("📦 Source Code", url="https://github.com/connect-bad/VirusTotal-Bot2.0")
     ]]))
 
 
