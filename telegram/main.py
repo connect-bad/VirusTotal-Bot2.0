@@ -32,7 +32,7 @@ def log_task_error(task: asyncio.Task):
 async def strt(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
 
     START = f'👋🏻 Hello! {message.from_user.mention}\
-    \nI am a Bot based on **[VT-SCRAP](https://github.com/Brijeshkrishna/virustotal-scrapper)**\
+    \nI am a Bot based on **[VirusTotal-Bot](https://github.com/bipinkrish/VirusTotal-Bot)**\
 \
     \n\n__• You can send the file to the bot or forward it from another channel, and it will check file to **[VirusTotal](http://virustotal.com/)** with over **70** different antiviruses.\
 \
@@ -40,11 +40,14 @@ async def strt(client: pyrogram.client.Client, message: pyrogram.types.messages_
 \
     \n\n• With the help of a bot, you can analyse suspicious files to identify virus and other bad programs.\
 \
-    \n\n• You can also add me to your chats, and I will be able to analyse the files sent by participants.__'
+    \n\n• You can also add me to your chats, and I will be able to analyse the files sent by participants.\
+\
+
+     \n\n• ⚠️ Important Warning: Do NOT upload sensitive files (passwords, personal photos, financial docs). Once uploaded to Virus Total, files may be visible to security researchers worldwide.__'
 
     await app.send_message(message.chat.id, START, reply_to_message_id=message.id, disable_web_page_preview=True,
     reply_markup=InlineKeyboardMarkup([[
-                                           InlineKeyboardButton( "📦 Source Code", url="https://github.com/bipinkrish/VirusTotal-Bot" )
+                                           InlineKeyboardButton( "📦 Source Code", url="https://github.com/connect-bad/VirusTotal-Bot" )
                                       ]]))
 
 
