@@ -99,9 +99,21 @@ def log_task_error(task: asyncio.Task):
 
 def extract_url(text):
     """Extract URL from message text"""
-    url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+    # More flexible URL pattern
+    url_pattern = r'https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&/=]*)'
     match = re.search(url_pattern, text)
-    return match.group(0) if match else None
+    if match:
+        return match.group(0)
+    
+    # Also try to detect URLs without protocol
+    text = text.strip()
+    if '.' in text and ' ' not in text:
+        # Might be a URL without http://
+        if not text.startswith(('http://', 'https://')):
+            return 'https://' + text
+        return text
+    
+    return None
 
 
 # Create downloads directory
