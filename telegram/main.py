@@ -1,24 +1,35 @@
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup,InlineKeyboardButton
-import pyrogram
+import asyncio
+import logging
 import os
-import botfunctions
-import threading
-import time
+
+import pyrogram
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from telegraph import Telegraph
+
+import botfunctions
 
 # bot
 bot_token = os.environ.get("TOKEN", "") 
 api_hash = os.environ.get("HASH", "") 
 api_id = os.environ.get("ID", "")
-app = Client("my_bot",api_id=api_id, api_hash=api_hash,bot_token=bot_token)
+app = Client("my_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 MAXSIZE = 681574400
 telegraph = Telegraph()
 telegraph.create_account(short_name='VirusTotal')
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+def status_file_path(message_id):
+    return f"{message_id}downstatus.txt"
+
+
+def log_task_error(task: asyncio.Task):
+    if task.exception():
+        logger.error("Scan task failed", exc_info=task.exception())
 
 # start command
 @app.on_message(filters.command(["start"]))
-def strt(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
+async def strt(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
 
     START = f'👋🏻 Hello! {message.from_user.mention}\
     \nI am a Bot based on **[VT-SCRAP](https://github.com/Brijeshkrishna/virustotal-scrapper)**\
@@ -31,67 +42,68 @@ def strt(client: pyrogram.client.Client, message: pyrogram.types.messages_and_me
 \
     \n\n• You can also add me to your chats, and I will be able to analyse the files sent by participants.__'
 
-    app.send_message(message.chat.id, START, reply_to_message_id=message.id, disable_web_page_preview=True,
+    await app.send_message(message.chat.id, START, reply_to_message_id=message.id, disable_web_page_preview=True,
     reply_markup=InlineKeyboardMarkup([[
                                            InlineKeyboardButton( "📦 Source Code", url="https://github.com/bipinkrish/VirusTotal-Bot" )
                                       ]]))
 
 
 # status updater
-def downstatus(statusfile,message):
-    while True:
-        if os.path.exists(statusfile):
-            break  
+async def downstatus(statusfile, message):
+    while not os.path.exists(statusfile):
+        await asyncio.sleep(1)
+
     while os.path.exists(statusfile):
-        with open(statusfile,"r") as upread:
+        with open(statusfile, "r") as upread:
             txt = upread.read()
         try:
-            app.edit_message_text(message.chat.id, message.id, f"🔽 Downloaded... {txt}")
-            time.sleep(10)
-        except:
-            time.sleep(5)
+            await app.edit_message_text(message.chat.id, message.id, f"🔽 Downloaded... {txt}")
+            await asyncio.sleep(10)
+        except Exception:
+            await asyncio.sleep(5)
 
 
 # progress function
 def progress(current, total, message):
-    with open(f'{message.id}downstatus.txt',"w") as fileup:
+    with open(status_file_path(message.id),"w") as fileup:
         fileup.write(f"{current * 100 / total:.1f}%")
 
 
 # check function
-def checkvirus(message):
-    msg = app.send_message(message.chat.id, '🔽 Downloading...', reply_to_message_id=message.id)
-    print(f"Downloading: ID:  {message.id}  size: {message.document.file_size}")
-    dnsta = threading.Thread(target=lambda:downstatus(f'{message.id}downstatus.txt',msg),daemon=True)
-    dnsta.start()
+async def checkvirus(message):
+    msg = await app.send_message(message.chat.id, '🔽 Downloading...', reply_to_message_id=message.id)
+    logger.info("Downloading: ID: %s size: %s", message.id, message.document.file_size)
+    dnsta = asyncio.create_task(downstatus(status_file_path(message.id), msg))
 
-    file = app.download_media(message,progress=progress, progress_args=[message])
-    os.remove(f'{message.id}downstatus.txt')
-    app.edit_message_text(message.chat.id, msg.id, '🔼 Uploading to VirusTotal...')
-    print(f"Uploading: ID: {message.id}  size: {message.document.file_size}")
+    file = await app.download_media(message, progress=progress, progress_args=[message])
+    status_path = status_file_path(message.id)
+    if os.path.exists(status_path):
+        os.remove(status_path)
+    await app.edit_message_text(message.chat.id, msg.id, '🔼 Uploading to VirusTotal...')
+    logger.info("Uploading: ID: %s size: %s", message.id, message.document.file_size)
 
-    hash = botfunctions.uploadfile(file)
+    hash = await asyncio.to_thread(botfunctions.uploadfile, file)
     os.remove(file)
-    print(f'ID: {message.id}  HASH: {hash}')
+    logger.info('ID: %s HASH: %s', message.id, hash)
     
-    if hash == 0:
-        app.edit_message_text(message.chat.id, msg.id, "✖️ Failed")
-        print("HASH is 0")
+    if not hash:
+        await app.edit_message_text(message.chat.id, msg.id, "✖️ Failed")
+        logger.error("HASH is empty")
         return
         
-    app.edit_message_text(message.chat.id, msg.id, '⚙️ Checking...')
-    print(f"Checking: ID:  {message.id}  size: {message.document.file_size}")
-    maintext, checktext, signatures, link = botfunctions.cleaninfo(hash)
+    await app.edit_message_text(message.chat.id, msg.id, '⚙️ Checking...')
+    logger.info("Checking: ID: %s size: %s", message.id, message.document.file_size)
+    maintext, checktext, signatures, link = await asyncio.to_thread(botfunctions.cleaninfo, hash)
     
     if maintext == None:
-        app.edit_message_text(message.chat.id, msg.id, "✖️ Failed")
-        print("Function returned None")
+        await app.edit_message_text(message.chat.id, msg.id, "✖️ Failed")
+        logger.error("Function returned None")
         return
 
-    response = telegraph.create_page('VT',content=[f'{maintext}-|-{checktext}-|-{signatures}-|-{link}'])
+    response = telegraph.create_page('VT', content=[f'{maintext}-|-{checktext}-|-{signatures}-|-{link}'])
     tlink = response['url']
 
-    app.edit_message_text(message.chat.id, msg.id, maintext,
+    await app.edit_message_text(message.chat.id, msg.id, maintext,
             reply_markup=InlineKeyboardMarkup([[  
                                                     InlineKeyboardButton( "🧪 Detections", callback_data=f"D|{tlink}"),
                                                     InlineKeyboardButton( "🌡 Signatures", callback_data=f"S|{tlink}"),
@@ -99,21 +111,22 @@ def checkvirus(message):
                                               [
                                                 InlineKeyboardButton( "🔗 View on VirusTotal", url=link )
                                               ]]))
-                                              
-                                              
+                                               
+                                               
 # document
 @app.on_message(filters.document)
-def docu(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
+async def docu(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
     if int(message.document.file_size) > MAXSIZE:
-        app.send_message(message.chat.id, "⭕️ File is too Big for VirusTotal. It should be less than 650 MB", reply_to_message_id=message.id)
+        await app.send_message(message.chat.id, "⭕️ File is too Big for VirusTotal. It should be less than 650 MB", reply_to_message_id=message.id)
         return
-    vt = threading.Thread(target=lambda:checkvirus(message),daemon=True)
-    vt.start()	
+    task = asyncio.create_task(checkvirus(message))
+    task.add_done_callback(log_task_error)
 	
 
 # call back functon
 @app.on_callback_query()
-def callbck(client: pyrogram.client.Client, message: pyrogram.types.CallbackQuery):
+async def callbck(client: pyrogram.client.Client, message: pyrogram.types.CallbackQuery):
+    await message.answer()
     url = message.message.reply_markup.inline_keyboard[1][0].url
     datas = message.data.split("|")
     action = datas[0]
@@ -125,7 +138,7 @@ def callbck(client: pyrogram.client.Client, message: pyrogram.types.CallbackQuer
     signatures = result[2]
 
     if action == "B":
-        app.edit_message_text(message.message.chat.id, message.message.id, maintext,
+        await app.edit_message_text(message.message.chat.id, message.message.id, maintext,
                 reply_markup=InlineKeyboardMarkup([[  
                                                         InlineKeyboardButton( "🧪 Detections", callback_data=f"D|{tlink}"),
                                                         InlineKeyboardButton( "🌡 Signatures", callback_data=f"S|{tlink}")
@@ -135,7 +148,7 @@ def callbck(client: pyrogram.client.Client, message: pyrogram.types.CallbackQuer
                                                 ]]))
 
     if action == "D":
-        app.edit_message_text(message.message.chat.id, message.message.id, checktext,
+        await app.edit_message_text(message.message.chat.id, message.message.id, checktext,
                 reply_markup=InlineKeyboardMarkup([[  
                                                         InlineKeyboardButton( "🔙 Back", callback_data=f"B|{tlink}"),
                                                         InlineKeyboardButton( "🌡 Signatures", callback_data=f"S|{tlink}"),
@@ -145,7 +158,7 @@ def callbck(client: pyrogram.client.Client, message: pyrogram.types.CallbackQuer
                                                 ]]))
 
     if action == "S":
-        app.edit_message_text(message.message.chat.id, message.message.id, signatures,
+        await app.edit_message_text(message.message.chat.id, message.message.id, signatures,
                 reply_markup=InlineKeyboardMarkup([[  
                                                         InlineKeyboardButton( "🔙 Back", callback_data=f"B|{tlink}"),
                                                         InlineKeyboardButton( "🧪 Detections", callback_data=f"D|{tlink}")
@@ -157,6 +170,6 @@ def callbck(client: pyrogram.client.Client, message: pyrogram.types.CallbackQuer
     
 # app run
 if __name__ == "__main__":
-    print("Bot is starting...")
+    logger.info("Bot is starting...")
     app.run()
-    print("Bot stopped")
+    logger.info("Bot stopped")
