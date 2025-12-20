@@ -155,5 +155,8 @@ def callbck(client: pyrogram.client.Client, message: pyrogram.types.CallbackQuer
                                                 ]]))
 	           
     
-# app run	
-app.run()	
+# app run
+if __name__ == "__main__":
+    print("Bot is starting...")
+    app.run()
+    print("Bot stopped")
