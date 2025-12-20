@@ -30,20 +30,21 @@ def log_task_error(task: asyncio.Task):
 # start command
 @app.on_message(filters.command(["start"]))
 async def strt(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
+    # FIXED: Used triple quotes (""") to handle multi-line text safely without syntax errors
+    START = f"""👋🏻 Hello! {message.from_user.mention}
 
-    START = f'👋🏻 Hello! {message.from_user.mention}\
-    \nI am a Bot based on **[VirusTotal-Bot](https://github.com/bipinkrish/VirusTotal-Bot)**\
-\
-    \n\n__• You can send the file to the bot or forward it from another channel, and it will check file to **[VirusTotal](http://virustotal.com/)** with over **70** different antiviruses.\
-\
-    \n\n• To get scan results - send me any a file up to **650 MB** in size, and you will receive a detailed analysis of it.\
-\
-    \n\n• With the help of a bot, you can analyse suspicious files to identify virus and other bad programs.\
-\
-    \n\n• You can also add me to your chats, and I will be able to analyse the files sent by participants.\
-\
+I am a Bot based on **[VirusTotal-Bot](https://github.com/bipinkrish/VirusTotal-Bot)**
 
-     \n\n• ⚠️ Important Warning: Do NOT upload sensitive files (passwords, personal photos, financial docs). Once uploaded to Virus Total, files may be visible to security researchers worldwide.__'
+__• You can send the file to the bot or forward it from another channel, and it will check file to **[VirusTotal](http://virustotal.com/)** with over **70** different antiviruses.
+
+• To get scan results - send me any a file up to **650 MB** in size, and you will receive a detailed analysis of it.
+
+• With the help of a bot, you can analyse suspicious files to identify virus and other bad programs.
+
+• You can also add me to your chats, and I will be able to analyse the files sent by participants.
+
+• ⚠️ Important Warning: Do NOT upload sensitive files (passwords, personal photos, financial docs). Once uploaded to Virus Total, files may be visible to security researchers worldwide.__"""
+
 
     await app.send_message(message.chat.id, START, reply_to_message_id=message.id, disable_web_page_preview=True,
     reply_markup=InlineKeyboardMarkup([[
