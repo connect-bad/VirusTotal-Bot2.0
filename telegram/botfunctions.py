@@ -29,8 +29,29 @@ def uploadfile(file_path: str):
         return None
 
     file_hash = _hash_file(file_path)
+    file_size = os.path.getsize(file_path)
+    
+    # Check if file already exists on VirusTotal (avoid re-uploading)
+    existing = file_info(file_hash)
+    if existing:
+        logger.info("File already exists on VirusTotal, skipping upload")
+        return file_hash
+    
+    # For files larger than 32MB, request a special upload URL
+    if file_size > 32 * 1024 * 1024:  # 32 MB in bytes
+        logger.info("Large file detected (%.2f MB), requesting upload URL...", file_size / (1024 * 1024))
+        url_response = session.get(f"{BASE_URL}/files/upload_url")
+        if not url_response.ok:
+            logger.error("Failed to get upload URL: %s", url_response.text)
+            return None
+        upload_url = url_response.json().get("data")
+    else:
+        upload_url = f"{BASE_URL}/files"
+    
+    # Upload the file
+    logger.info("Uploading to: %s", upload_url)
     with open(file_path, "rb") as fp:
-        response = session.post(f"{BASE_URL}/files", files={"file": (os.path.basename(file_path), fp)})
+        response = session.post(upload_url, files={"file": (os.path.basename(file_path), fp)})
 
     if not response.ok:
         logger.error("VirusTotal upload failed: %s - %s", response.status_code, response.text)
