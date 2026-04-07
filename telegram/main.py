@@ -378,16 +378,19 @@ async def callbck(client: pyrogram.client.Client, message: pyrogram.types.Callba
 
 # ============ BOT STARTUP ============
 
-# 1. Kuma Push Function
+# Kuma Push Function (with Error Logging)
 def kuma_push():
-    # Niche wale link ki jagah apna Uptime Kuma ka Push URL dalein
+    # Yahan apna asli https://example.tech wala pura URL daalein
     push_url = "https://mrbady.tech/api/push/vz8QyXe2AL?status=up&msg=OK&ping=" 
+    
     while True:
         try:
-            requests.get(push_url)
-        except:
-            pass
-        time.sleep(60)
+            response = requests.get(push_url)
+            logger.info(f"✅ Uptime Kuma Ping Sent! Status Code: {response.status_code}")
+        except Exception as e:
+            logger.error(f"❌ Uptime Kuma Ping Failed: {e}")
+        time.sleep(20)
+
 
 if __name__ == "__main__":
     import signal
