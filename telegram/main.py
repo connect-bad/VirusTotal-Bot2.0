@@ -4,6 +4,9 @@ import os
 import time
 import glob
 import re
+import requests
+import threading
+
 
 import pyrogram
 from pyrogram import Client, filters
@@ -375,20 +378,35 @@ async def callbck(client: pyrogram.client.Client, message: pyrogram.types.Callba
 
 # ============ BOT STARTUP ============
 
+# 1. Kuma Push Function
+def kuma_push():
+    # Niche wale link ki jagah apna Uptime Kuma ka Push URL dalein
+    push_url = "https://mrbady.tech/api/push/vz8QyXe2AL?status=up&msg=OK&ping=" 
+    while True:
+        try:
+            requests.get(push_url)
+        except:
+            pass
+        time.sleep(60)
+
 if __name__ == "__main__":
     import signal
-    
+
     logger.info("Bot is starting...")
-    
+
     def signal_handler(sig, frame):
         logger.info("Stopping bot...")
         app.stop()
-    
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     try:
         logger.info("✅ Bot started and running!")
+        
+        # 2. Bot start hone ke sath Push ping bhi chalu kar do
+        threading.Thread(target=kuma_push, daemon=True).start()
+        
         app.run()
     except Exception as e:
         logger.error(f"Bot crashed: {e}", exc_info=True)
