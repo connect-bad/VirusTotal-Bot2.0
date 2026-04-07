@@ -393,7 +393,7 @@ def kuma_push():
             logger.info(f"✅ Ping Sent via Worker! Status: {response.status_code}")
         except Exception as e:
             logger.error(f"❌ Ping Failed: {e}")
-        time.sleep(20)
+        time.sleep(60)
 
 
 
