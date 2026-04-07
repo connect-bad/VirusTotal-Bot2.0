@@ -378,24 +378,23 @@ async def callbck(client: pyrogram.client.Client, message: pyrogram.types.Callba
 
 # ============ BOT STARTUP ============
 
-# Kuma Push Function (with Cloudflare Bypass)
 def kuma_push():
-    # Yahan apna Uptime Kuma ka Push URL daalein
-    push_url = "https://mrbady.tech/api/push/h2mPlDp1q0?status=up&msg=OK&ping=" 
+    # ⚠️ Yahan Cloudflare Worker wala naya URL daalein (.workers.dev wala)
+    push_url = "https://deliver.connectbadsha.workers.dev"
     
-    # Chrome Browser ka mask (Cloudflare ko trick karne ke liye)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Heroku-Bot"
     }
-
+    
     while True:
         try:
-            # Ab hum headers bhi bhej rahe hain
+            # Ab Heroku bot seedha Worker ko ping karega
             response = requests.get(push_url, headers=headers)
-            logger.info(f"✅ Uptime Kuma Ping Sent! Status Code: {response.status_code}")
+            logger.info(f"✅ Ping Sent via Worker! Status: {response.status_code}")
         except Exception as e:
-            logger.error(f"❌ Uptime Kuma Ping Failed: {e}")
-        time.sleep(20) # (Aapne 20s rakha hai, toh 20 hi rehne dijiye)
+            logger.error(f"❌ Ping Failed: {e}")
+        time.sleep(20)
+
 
 
 
