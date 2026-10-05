@@ -179,9 +179,10 @@ def _parse(kind: str, key: str, obj: dict, link: str) -> Report:
     if kind == "file":
         rep.sha256 = attrs.get("sha256") or obj.get("id", "")
         rep.title = attrs.get("meaningful_name") or (attrs.get("names") or [rep.sha256])[0]
-        desc = attrs.get("type_description", "") or ""
+        ext = attrs.get("type_extension", "") or ""
         tag = attrs.get("type_tag", "") or ""
-        rep.file_type = f"{desc} ({tag})" if desc and tag else desc or tag
+        desc = attrs.get("type_description", "") or ""
+        rep.file_type = f"{ext} ({tag})" if ext and tag else ext or tag or desc
         rep.size = attrs.get("size", 0) or 0
         magic = attrs.get("magic", "") or ""
         rep.magic = "" if magic.upper() == "N/A" else magic
