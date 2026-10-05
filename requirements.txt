@@ -1,6 +1,7 @@
 requests
 rich
 kurigram 
+pyrospeed
 tgcrypto
 pydantic
 free-proxy
