@@ -49,6 +49,11 @@ app = Client(
 )
 queue = JobQueue(workers=QUEUE_WORKERS)
 
+if os.environ.get("USE_PYROSPEED") == "1":
+    from pyrospeed import PyroSpeed
+    speed = PyroSpeed(app)
+    speed.install()
+
 stats = {"files": 0, "urls": 0, "hashes": 0, "rescans": 0, "cached": 0, "errors": 0}
 start_time = time.time()
 
