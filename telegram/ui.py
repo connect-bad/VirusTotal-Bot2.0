@@ -9,15 +9,6 @@ from botfunctions import Report
 
 
 # ---------------------------------------------------------------- small helpers
-def bar(det: int, total: int, width: int = 10) -> str:
-    if total <= 0:
-        return "▱" * width
-    filled = round(det / total * width)
-    if det and not filled:
-        filled = 1
-    return "▰" * filled + "▱" * (width - filled)
-
-
 def fmt_size(n: int) -> str:
     if n >= 1024 * 1024:
         return f"{n / 1024 / 1024:.2f} MB"
@@ -46,69 +37,73 @@ def _bq(lines: List[str], limit: int = 3000, expandable: bool = True) -> str:
         out.append(line)
         used += len(line) + 1
     tag = "blockquote expandable" if expandable else "blockquote"
-    return f"<{tag}>{chr(10).join(out)}</{tag.split()[0]}>"
+    return f"<{tag}>{chr(10).join(out)}</blockquote>"
 
 
-def _chunks(items: List[str], n: int = 4) -> List[str]:
-    return [" · ".join(esc(x) for x in items[i:i + n]) for i in range(0, len(items), n)]
+def _section(emoji: str, title: str, names: List[str], limit: int) -> List[str]:
+    """One engine per line, inside a collapsible quote."""
+    return ["", f"{emoji} <b>{title}</b> ({len(names)})", _bq([esc(n) for n in names], limit)]
 
 
 # ---------------------------------------------------------------- views
 def render_main(rep: Report) -> str:
     emoji, label = verdict(rep)
-    head = f"{emoji} <b>{label}</b>"
+    lines = [f"{emoji} <b>{label}</b>"]
     if not rep.pending:
-        head += f"  ·  <b>{rep.det}/{rep.total}</b>\n{bar(rep.det, rep.total)}"
-    lines = [head, ""]
+        lines.append(f"🧬 <b>Detections:</b> {rep.det}/{rep.total}")
+    lines.append("")
 
     if rep.kind == "file":
-        lines.append(f"<b>{esc(rep.title)}</b>")
-        sub = " · ".join(x for x in (rep.file_type, fmt_size(rep.size) if rep.size else "") if x)
-        if sub:
-            lines.append(f"<i>{esc(sub)}</i>")
+        lines.append("📄 <b>File name:</b>")
+        lines.append(f"<code>{esc(rep.title)}</code>")
+        lines.append("")
+        if rep.file_type:
+            lines.append(f"🗂 <b>File type:</b> {esc(rep.file_type)}")
+        if rep.size:
+            lines.append(f"💾 <b>Size:</b> {fmt_size(rep.size)}")
+        if rep.package:
+            lines.append(f"📦 <b>Package:</b> <code>{esc(rep.package)}</code>")
+        if rep.version:
+            lines.append(f"🔖 <b>Version:</b> v{esc(rep.version)}")
     else:
-        lines.append(f"🔗 <code>{esc(rep.url[:200])}</code>")
+        lines.append(f"🔗 <b>URL:</b> <spoiler>{esc(rep.url[:300])}</spoiler>")
 
     if rep.threat:
-        lines.append(f"🏷 <b>Threat:</b> {esc(rep.threat)}")
-    if rep.package:
-        pkg = f"📦 <code>{esc(rep.package)}</code>"
-        if rep.version:
-            pkg += f" · v{esc(rep.version)}"
-        lines.append(pkg)
+        lines.append(f"☣️ <b>Threat:</b> {esc(rep.threat)}")
 
-    meta = []
+    times = []
     if rep.first_seen:
-        meta.append(f"🔬 First seen · {rep.first_seen}")
+        times.append(f"🔬 <b>First seen:</b> {rep.first_seen}")
     if rep.last_seen:
-        meta.append(f"🔭 Last analysed · {rep.last_seen}")
+        times.append(f"🔭 <b>Last analysed:</b> {rep.last_seen}")
     if rep.submitted:
-        meta.append(f"🔁 Submitted · {rep.submitted}×")
+        times.append(f"⏱ <b>Submitted:</b> {rep.submitted}×")
+    if times:
+        lines += [""] + times
+
     if rep.magic:
-        meta.append(f"🧩 {esc(rep.magic[:80])}")
-    if meta:
-        lines += ["", _bq(meta, expandable=False)]
+        lines += ["", f"🧩 <b>Magic:</b> {esc(rep.magic[:100])}"]
+
+    if rep.kind == "file" and rep.sha256:
+        lines += ["", f"🔐 <b>SHA-256:</b> <spoiler>{rep.sha256}</spoiler>"]
 
     if rep.pending:
         lines += ["", "⏳ <i>Engines are still scanning. Tap 🔄 Rescan in a moment.</i>"]
-    if rep.kind == "file" and rep.sha256:
-        lines += ["", f"<code>{rep.sha256}</code>"]
     return "\n".join(lines)
 
 
 def render_detections(rep: Report) -> str:
     if rep.pending:
-        return "🧪 <b>Detections</b>\n\n⏳ <i>Analysis pending. Go back and tap 🔄 Rescan.</i>"
-    parts = [f"🧪 <b>Detections</b> · {rep.det}/{rep.total}"]
+        return "🧬 <b>Detections</b>\n\n⏳ <i>Analysis pending. Go back and tap 🔄 Rescan.</i>"
+    parts = [f"🧬 <b>Detections:</b> {rep.det}/{rep.total}"]
     if rep.detected:
-        parts += ["", "❌ <b>Flagged</b>",
-                  _bq([esc(e) for e, _ in rep.detected], limit=1400)]
+        parts += _section("❌", "Flagged", [e for e, _ in rep.detected], 1100)
+    else:
+        parts += ["", "✅ <b>No engine flagged this</b> " + ("file" if rep.kind == "file" else "URL")]
     if rep.clean:
-        parts += ["", f"✅ <b>Clean</b> ({len(rep.clean)})",
-                  _bq(_chunks(rep.clean), limit=1500)]
+        parts += _section("✅", "Clean", rep.clean, 1500)
     if rep.unsupported:
-        parts += ["", f"⚠️ <b>Unsupported</b> ({len(rep.unsupported)})",
-                  _bq(_chunks(rep.unsupported), limit=700)]
+        parts += _section("⚠️", "Unsupported", rep.unsupported, 900)
     return "\n".join(parts)
 
 
@@ -119,7 +114,7 @@ def render_signatures(rep: Report) -> str:
         what = "file" if rep.kind == "file" else "URL"
         return f"🌡 <b>Signatures</b>\n\n✅ No engine flagged this {what}."
     lines = [f"<b>{esc(e)}</b>\n╰ {esc(r)}" for e, r in rep.detected]
-    return f"🌡 <b>Signatures</b> · {rep.det}\n\n" + _bq(lines, limit=3500)
+    return f"🌡 <b>Signatures:</b> {rep.det}\n\n" + _bq(lines, limit=3500)
 
 
 # ---------------------------------------------------------------- keyboard
